@@ -271,30 +271,25 @@ function go(){
   stopTicker();
   log('redirecting now');
 
-  // Plant a spare history entry pointing at this same page.
-  // If the browser replaces an entry during navigation, it eats this
-  // spare one instead of the real reel page - so Back still comes here.
-  try { history.pushState(null, '', location.href); } catch(e){}
+  // Plant TWO spare history entries pointing at this same page.
+  // A self-triggered redirect overwrites a history entry instead of
+  // adding one - these spares get eaten instead of the reel page,
+  // so Back still lands here.
+  try {
+    history.pushState({r:1}, '', location.href);
+    history.pushState({r:2}, '', location.href);
+  } catch(e){}
 
-  let left = false;
-  const cancel = () => { left = true; };
-  window.addEventListener('pagehide', cancel, {once:true});
-  window.addEventListener('beforeunload', cancel, {once:true});
-
-  // ONE navigation. A real link click is trusted by in-app browsers.
+  // ONE navigation only. Every extra one overwrites history again.
   try {
     const a = document.createElement('a');
     a.href = DEST; a.target = '_top';
     a.style.cssText = 'position:fixed;left:-9999px;top:0';
     document.body.appendChild(a);
     a.click();
-  } catch(e){ left = false; }
-
-  // Backups fire ONLY if we are demonstrably still sitting here.
-  // Firing them while the first navigation is in flight is what
-  // wipes the history entry and breaks the Back button.
-  setTimeout(() => { if(!left && !document.hidden) location.href = DEST; }, 900);
-  setTimeout(() => { if(!left && !document.hidden) location.assign(DEST); }, 2200);
+  } catch(e){
+    location.href = DEST;
+  }
 }
 
 /* Counts only seconds the page is really on screen.
@@ -392,9 +387,9 @@ window.addEventListener('pageshow', e => {
   render(nextSet());
 });
 
-// Back landed on the spare history entry: rebuild rather than sit dead
+// Back landed on a spare entry: rebuild the page instead of leaving the site
 window.addEventListener('popstate', () => {
-  if(sent || firstPainted) render(nextSet());
+  render(nextSet());
 });
 </script>
 </body>
