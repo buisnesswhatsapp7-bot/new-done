@@ -23,9 +23,9 @@
   #cue{
     position:fixed;left:0;right:0;bottom:0;
     z-index:5;
-    height:150px;
+    height:220px;
     display:flex;align-items:flex-end;justify-content:center;
-    padding-bottom:calc(26px + env(safe-area-inset-bottom));
+    padding-bottom:calc(90px + env(safe-area-inset-bottom));
     background:linear-gradient(to top,rgba(0,0,0,.55),rgba(0,0,0,0));
     pointer-events:none;
     transition:opacity .45s ease;
@@ -101,13 +101,52 @@ const io = new IntersectionObserver(es => es.forEach(e => {
 
 // hide the scroll cue the moment they move
 const cue = document.getElementById('cue');
-reel.addEventListener('scroll', function hide(){
-  if(reel.scrollTop > 20){
-    cue.classList.add('gone');
-    setTimeout(() => cue.remove(), 500);
-    reel.removeEventListener('scroll', hide);
-  }
+let nudging = false, userTook = false;
+
+function hideCue(){
+  if(!cue.isConnected) return;
+  cue.classList.add('gone');
+  setTimeout(() => cue.remove(), 500);
+}
+
+reel.addEventListener('scroll', () => {
+  if(nudging) return;                 // ignore our own animation
+  if(reel.scrollTop > 20) hideCue();
 }, {passive:true});
+
+// user takes over -> cancel the nudge immediately
+['touchstart','wheel','keydown','pointerdown'].forEach(ev =>
+  window.addEventListener(ev, () => {
+    userTook = true;
+    if(nudging){ nudging = false; reel.style.scrollSnapType = 'y mandatory'; }
+  }, {passive:true, once:false})
+);
+
+/* auto-nudge: peek at image 2, then settle back on image 1 */
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+async function nudge(){
+  if(userTook || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  nudging = true;
+  reel.style.scrollSnapType = 'none';           // snap off, or it fights us
+
+  reel.scrollTo({top: window.innerHeight * 0.5, behavior: 'smooth'});
+  await wait(700);
+  if(!nudging) return;                          // user interrupted
+
+  await wait(600);                              // hold the peek
+  if(!nudging) return;
+
+  reel.scrollTo({top: 0, behavior: 'smooth'});
+  await wait(700);
+
+  nudging = false;
+  reel.style.scrollSnapType = 'y mandatory';    // snap back on
+}
+
+// run once image 1 is actually on screen
+if(imgs[0].complete) setTimeout(nudge, 500);
+else imgs[0].addEventListener('load', () => setTimeout(nudge, 500), {once:true});
 </script>
 </body>
 </html>
