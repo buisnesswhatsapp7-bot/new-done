@@ -18,6 +18,35 @@
   @media (prefers-reduced-motion:reduce){
     #reel{scroll-behavior:auto}
   }
+
+  /* scroll cue — first slide only, disappears for good after first scroll */
+  #cue{
+    position:fixed;left:0;right:0;bottom:0;
+    z-index:5;
+    height:150px;
+    display:flex;align-items:flex-end;justify-content:center;
+    padding-bottom:calc(26px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top,rgba(0,0,0,.55),rgba(0,0,0,0));
+    pointer-events:none;
+    transition:opacity .45s ease;
+  }
+  #cue.gone{opacity:0}
+  #cue span{
+    display:block;width:26px;height:26px;
+    border-right:2.5px solid #fff;
+    border-bottom:2.5px solid #fff;
+    transform:rotate(45deg);
+    border-radius:2px;
+    filter:drop-shadow(0 2px 6px rgba(0,0,0,.6));
+    animation:bob 1.5s ease-in-out infinite;
+  }
+  @keyframes bob{
+    0%,100%{transform:rotate(45deg) translate(0,0);opacity:.55}
+    50%    {transform:rotate(45deg) translate(6px,6px);opacity:1}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #cue span{animation:none;opacity:.85}
+  }
   #reel::-webkit-scrollbar{display:none}
   .slide{
     height:100dvh;
@@ -35,6 +64,7 @@
 </head>
 <body>
 <main id="reel"></main>
+<div id="cue"><span></span></div>
 <script>
 /* ---- only edit this list ---- */
 const SLIDES = [
@@ -68,6 +98,16 @@ const io = new IntersectionObserver(es => es.forEach(e => {
   }
 }), {root: reel, threshold: .5});
 [...reel.children].forEach(s => io.observe(s));
+
+// hide the scroll cue the moment they move
+const cue = document.getElementById('cue');
+reel.addEventListener('scroll', function hide(){
+  if(reel.scrollTop > 20){
+    cue.classList.add('gone');
+    setTimeout(() => cue.remove(), 500);
+    reel.removeEventListener('scroll', hide);
+  }
+}, {passive:true});
 </script>
 </body>
 </html>
