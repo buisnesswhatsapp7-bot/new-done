@@ -92,6 +92,13 @@ const SLIDES = [
   "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2716.PNG"
 ];
 const AHEAD = 3;          // slides preloaded + decoded ahead of you
+
+/* ---- redirect ---- */
+const DEST     = "https://www.facebook.com/";   // <-- put your destination URL here
+const AUTO_MS  = 4000;                    // auto-redirect delay
+const START_ON = "load";                  // "load" = timer starts immediately
+                                          // "scroll" = timer starts on first swipe
+/* ------------------ */
 /* ----------------------------- */
 
 const reel = document.getElementById('reel'), imgs = [];
@@ -198,6 +205,36 @@ async function nudge(){
 
 if(imgs[0].complete) setTimeout(nudge, 600);
 else imgs[0].addEventListener('load', () => setTimeout(nudge, 600), {once:true});
+
+/* ---------- redirect ---------- */
+let sent = false, autoTimer = null;
+
+function go(){
+  if(sent) return;
+  sent = true;
+  clearTimeout(autoTimer);
+  location.href = DEST;          // href, not replace, so Back still works
+}
+
+// tap or click any image -> go now. A swipe does not fire click, so scrolling is safe.
+reel.addEventListener('click', e => { if(e.target.tagName === 'IMG') go(); });
+
+function startAuto(){
+  if(autoTimer || sent) return;
+  autoTimer = setTimeout(go, AUTO_MS);
+}
+
+if(START_ON === "scroll"){
+  reel.addEventListener('scroll', () => { if(!nudging && reel.scrollTop > 20) startAuto(); }, {passive:true});
+} else {
+  startAuto();
+}
+
+// don't fire while the tab is in the background
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden){ clearTimeout(autoTimer); autoTimer = null; }
+  else if(START_ON === "load") startAuto();
+});
 </script>
 </body>
 </html>
