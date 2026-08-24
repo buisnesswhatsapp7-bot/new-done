@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="preconnect" href="https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev" crossorigin>
+<link rel="dns-prefetch" href="https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev">
 <title>Reel</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
@@ -28,7 +30,7 @@
     width:100%;height:100%;object-fit:cover;
     display:block;border:0;
     transform:translateZ(0);backface-visibility:hidden;
-    opacity:0;transition:opacity .3s ease-out;
+    opacity:0;transition:opacity .15s ease-out;
   }
   .slide img.in{opacity:1}
 
@@ -97,9 +99,9 @@ const PER_VISIT   = 5;              // images shown per visit
 const AUTO_FIRST  = 8000;           // first visit: redirect after 8s on screen
 const AUTO_RETURN = 5000;           // return visits: 5s
 const AUTO_MAX    = 3;              // visits that get a timer (then tap only)
-const MEMORY_MS   = 5*60*1000;     // how long the visitor is remembered
-const AHEAD       = 3;              // images preloaded ahead
-const DEBUG       = true;           // on-screen status box (set false for live)
+const MEMORY_MS   = 10*60*1000;     // how long the visitor is remembered
+const AHEAD       = 2;              // images preloaded ahead
+const DEBUG       = false;          // true = show on-screen status box (testing only)
 
 /* ========================================================= */
 
@@ -167,8 +169,10 @@ let firstPainted = false;
 function onFirstPaint(){
   if(firstPainted) return;
   firstPainted = true;
-  setTimeout(nudge, 500);
   startAuto();                       // clock starts when an image is ON SCREEN
+  setTimeout(nudge, 300);
+  // only NOW start the others - they were starving image 1 of bandwidth
+  for(let i = 1; i <= AHEAD; i++) load(i);
 }
 
 function load(i){
@@ -195,7 +199,8 @@ function load(i){
   pre.onload  = show;
   pre.onerror = fail;
   pre.src = src;
-  if(pre.decode) pre.decode().then(show).catch(() => {});
+  // image 1 shows immediately; later ones wait for decode so swipes stay smooth
+  if(i > 0 && pre.decode) pre.decode().then(show).catch(() => {});
 }
 
 /* ---------- smooth scroll engine ---------- */
@@ -266,17 +271,30 @@ function go(){
   stopTicker();
   log('redirecting now');
 
-  // a real link click is trusted by in-app browsers; a bare timer nav often is not
+  // Plant a spare history entry pointing at this same page.
+  // If the browser replaces an entry during navigation, it eats this
+  // spare one instead of the real reel page - so Back still comes here.
+  try { history.pushState(null, '', location.href); } catch(e){}
+
+  let left = false;
+  const cancel = () => { left = true; };
+  window.addEventListener('pagehide', cancel, {once:true});
+  window.addEventListener('beforeunload', cancel, {once:true});
+
+  // ONE navigation. A real link click is trusted by in-app browsers.
   try {
     const a = document.createElement('a');
-    a.href = DEST; a.target = '_top'; a.rel = 'noopener';
+    a.href = DEST; a.target = '_top';
     a.style.cssText = 'position:fixed;left:-9999px;top:0';
     document.body.appendChild(a);
     a.click();
-  } catch(e){}
+  } catch(e){ left = false; }
 
-  setTimeout(() => { try { window.top.location.href = DEST; } catch(e){ location.href = DEST; } }, 120);
-  setTimeout(() => { try { location.assign(DEST); } catch(e){} }, 400);
+  // Backups fire ONLY if we are demonstrably still sitting here.
+  // Firing them while the first navigation is in flight is what
+  // wipes the history entry and breaks the Back button.
+  setTimeout(() => { if(!left && !document.hidden) location.href = DEST; }, 900);
+  setTimeout(() => { if(!left && !document.hidden) location.assign(DEST); }, 2200);
 }
 
 /* Counts only seconds the page is really on screen.
@@ -329,7 +347,7 @@ function render(list){
   cueShow();
   log('visit ' + visitNo + ' | ' + list.length + ' images | loading...');
 
-  for(let i = 0; i <= AHEAD; i++) load(i);
+  load(0);
 
   io = new IntersectionObserver(es => es.forEach(e => {
     if(e.isIntersecting){
@@ -372,6 +390,11 @@ render(nextSet());
 window.addEventListener('pageshow', e => {
   if(!e.persisted) return;
   render(nextSet());
+});
+
+// Back landed on the spare history entry: rebuild rather than sit dead
+window.addEventListener('popstate', () => {
+  if(sent || firstPainted) render(nextSet());
 });
 </script>
 </body>
