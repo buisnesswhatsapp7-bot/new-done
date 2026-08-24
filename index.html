@@ -11,6 +11,7 @@
   #reel{
     height:100dvh;
     overflow-y:scroll;
+    scroll-snap-type:y mandatory;
     scroll-behavior:smooth;
     -webkit-overflow-scrolling:touch;
     scrollbar-width:none;
@@ -20,7 +21,6 @@
   }
   #reel::-webkit-scrollbar{display:none}
 
-  #reel.snap{scroll-snap-type:y mandatory}
   .slide{
     height:100dvh;
     scroll-snap-align:start;
@@ -41,10 +41,6 @@
     transition:opacity .3s ease-out;
   }
   .slide img.in{opacity:1}
-
-  /* joined: images stack full-width at true aspect, no crop, no seam */
-  #reel.joined .slide{height:auto;scroll-snap-align:none}
-  #reel.joined .slide img{height:auto;object-fit:fill;vertical-align:bottom}
 
   @media (prefers-reduced-motion:reduce){
     #reel{scroll-behavior:auto}
@@ -96,11 +92,9 @@ const SLIDES = [
   "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2716.PNG"
 ];
 const AHEAD = 3;          // slides preloaded + decoded ahead of you
-const JOINED = true;      // true = one continuous strip | false = snap per image
 /* ----------------------------- */
 
 const reel = document.getElementById('reel'), imgs = [];
-reel.className = JOINED ? 'joined' : 'snap';
 
 SLIDES.forEach((src,i)=>{
   const s = document.createElement('section');
@@ -178,7 +172,7 @@ function stopNudge(){
   if(nudging){
     nudging = false;
     cancelAnimationFrame(anim);
-    reel.style.scrollSnapType = '';
+    reel.style.scrollSnapType = 'y mandatory';
   }
 }
 ['touchstart','wheel','keydown','pointerdown'].forEach(ev =>
@@ -199,7 +193,7 @@ async function nudge(){
   if(!await glide(0, 950, easeOutQuint)) return;
 
   nudging = false;
-  reel.style.scrollSnapType = '';
+  reel.style.scrollSnapType = 'y mandatory';
 }
 
 if(imgs[0].complete) setTimeout(nudge, 600);
