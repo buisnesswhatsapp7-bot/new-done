@@ -89,15 +89,24 @@ const POOL = [
   "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2722.PNG",
   "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2725.PNG",
   "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2723.PNG",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2724.PNG"
+  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2724.PNG",
+  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/Screenshot_2026-08-24-17-20-21-29_a23b203fd3aafc6dcb84e438dda678b6.jpg",
+  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/Screenshot_2026-08-24-17-24-34-29_a23b203fd3aafc6dcb84e438dda678b6.jpg",
+  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/Screenshot_2026-08-24-17-24-50-30_a23b203fd3aafc6dcb84e438dda678b6.jpg",
+  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/Screenshot_2026-08-24-17-25-04-34_a23b203fd3aafc6dcb84e438dda678b6.jpg",
+  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/Screenshot_2026-08-24-17-27-29-90_a23b203fd3aafc6dcb84e438dda678b6.jpg",
+  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_20260824_172321.jpg"
 ];
 
-const PER_VISIT = 3;                      // how many images to show per visit
+const PER_VISIT = 5;                      // how many images to show per visit
 const AHEAD     = 3;                      // slides preloaded + decoded ahead
 const MEMORY_MS = 10 * 60 * 1000;         // how long "already seen" is remembered (10 min)
 
 const DEST      = "https://msfcfinance.in/2025/09/12/best-credit-cards-in-the-uk-2025-cashback-0-deals-travel-cards-you-should-know-about/";
-const AUTO_MS   = 8000;                   // auto-redirect delay
+const AUTO_FIRST  = 8000;                 // auto-redirect delay, first visit
+const AUTO_RETURN = 5000;                 // auto-redirect delay, return visits
+const AUTO_MAX    = 3;                    // how many visits get auto-redirect
+                                          // (after this: tap only. 0 = never auto)
 const START_ON  = "load";                 // "load" or "scroll"
 
 /* ============================================== */
@@ -107,18 +116,20 @@ let imgs = [], io = null, anim = null;
 let nudging = false, userTook = false, sent = false, autoTimer = null;
 
 /* ---- remembers which images this visitor already saw ---- */
-let memSeen = {t:0, list:[]};
-function seenGet(){
-  let rec = memSeen;
-  try { rec = JSON.parse(localStorage.getItem('rseen') || 'null') || memSeen; } catch(e){}
-  // expired -> forget everything, visitor starts fresh
-  if(!rec.t || Date.now() - rec.t > MEMORY_MS) return [];
-  return rec.list || [];
+let memRec = null;
+let visitNo = 0;                  // 0 = first visit, 1 = first return, ...
+
+function recGet(){
+  let rec = memRec;
+  try { rec = JSON.parse(localStorage.getItem('rseen') || 'null') || memRec; } catch(e){}
+  // expired -> forget everything, visitor is brand new again
+  if(!rec || !rec.t || Date.now() - rec.t > MEMORY_MS) return null;
+  return rec;
 }
-function seenSet(list){
-  // timestamp refreshes on every visit, so an active session keeps skipping
-  const rec = {t: Date.now(), list: list};
-  memSeen = rec;
+function recSet(list, v){
+  // timestamp refreshes each visit, so an active session keeps its memory
+  const rec = {t: Date.now(), list: list, v: v};
+  memRec = rec;
   try { localStorage.setItem('rseen', JSON.stringify(rec)); } catch(e){}
 }
 
@@ -126,18 +137,20 @@ function seenSet(list){
    When the pool runs out, a fresh cycle starts automatically. */
 function nextSet(){
   const n = Math.min(PER_VISIT, POOL.length);
-  const seen = seenGet();
-  const unseen = POOL.filter(u => !seen.includes(u));
+  const rec = recGet();
+  const seen = rec ? (rec.list || []) : [];
+  visitNo = rec ? (rec.v || 0) : 0;
 
+  const unseen = POOL.filter(u => !seen.includes(u));
   let out = unseen.slice(0, n);
 
   if(out.length < n){
-    // everything has been seen -> begin a new cycle
+    // everything has been seen -> begin a new cycle of images
     const rest = POOL.filter(u => !out.includes(u));
     out = out.concat(rest.slice(0, n - out.length));
-    seenSet(out);
+    recSet(out, visitNo + 1);
   } else {
-    seenSet(seen.concat(out));
+    recSet(seen.concat(out), visitNo + 1);
   }
   return out;
 }
@@ -226,7 +239,9 @@ function go(){
 }
 function startAuto(){
   if(autoTimer || sent) return;
-  autoTimer = setTimeout(go, AUTO_MS);
+  if(visitNo >= AUTO_MAX) return;              // tap-only from here on
+  const delay = visitNo === 0 ? AUTO_FIRST : AUTO_RETURN;
+  autoTimer = setTimeout(go, delay);
 }
 
 /* ---- build (or rebuild) the reel ---- */
