@@ -114,7 +114,7 @@ const DEBUG     = true;                   // true = log timer info to console
 
 const reel = document.getElementById('reel');
 let imgs = [], io = null, anim = null;
-let nudging = false, userTook = false, sent = false, autoTimer = null;
+let nudging = false, userTook = false, sent = false;
 
 /* ---- remembers which images this visitor already saw ---- */
 // open the page with ?reset on the end to wipe the visitor memory (testing)
@@ -240,25 +240,60 @@ function stopNudge(){
 function go(){
   if(sent) return;
   sent = true;
-  clearTimeout(autoTimer);
+  stopTicker();
   if(DEBUG) console.log('[reel] redirecting ->', DEST);
-  try { (window.top || window).location.href = DEST; }
-  catch(e){ location.href = DEST; }
+
+  // A real link click is trusted by in-app browsers (Facebook, Instagram).
+  // A bare location change from a timer often gets ignored there.
+  try {
+    const a = document.createElement('a');
+    a.href = DEST; a.target = '_top'; a.rel = 'noopener';
+    a.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(a);
+    a.click();
+  } catch(e){}
+
+  // fallbacks, in order, if we're still on the page
+  setTimeout(() => { try { (window.top || window).location.href = DEST; } catch(e){ location.href = DEST; } }, 120);
+  setTimeout(() => { try { location.assign(DEST); } catch(e){} }, 400);
 }
+
+/* Timer that counts ONLY the seconds the page is really on screen.
+   Facebook preloads pages in a hidden window and freezes plain timers,
+   so we tick repeatedly instead of waiting on one long countdown. */
+let elapsed = 0, ticker = null, lastTick = 0;
+
+function stopTicker(){
+  if(ticker){ clearInterval(ticker); ticker = null; }
+}
+
+function tick(){
+  const now = Date.now();
+  if(document.visibilityState === 'hidden'){
+    lastTick = now;              // page not really being looked at: don't count it
+    return;
+  }
+  elapsed += now - lastTick;
+  lastTick = now;
+  const delay = visitNo === 0 ? AUTO_FIRST : AUTO_RETURN;
+  if(elapsed >= delay) go();
+}
+
 function startAuto(){
-  if(autoTimer || sent) return;
+  if(sent || ticker) return;
   if(visitNo >= AUTO_MAX){
     if(DEBUG) console.log('[reel] visit', visitNo, '- auto-redirect used up, tap only. Add ?reset to the URL to start over.');
     return;
   }
   const delay = visitNo === 0 ? AUTO_FIRST : AUTO_RETURN;
-  if(DEBUG) console.log('[reel] visit', visitNo, '- auto-redirect in', delay/1000, 'sec');
-  autoTimer = setTimeout(go, delay);
+  if(DEBUG) console.log('[reel] visit', visitNo, '- auto-redirect after', delay/1000, 'sec of screen time');
+  lastTick = Date.now();
+  ticker = setInterval(tick, 200);
 }
 
 /* ---- build (or rebuild) the reel ---- */
 function render(list){
-  clearTimeout(autoTimer); autoTimer = null;
+  stopTicker(); elapsed = 0;
   cancelAnimationFrame(anim);
   if(io) io.disconnect();
   reel.innerHTML = '';
@@ -308,10 +343,10 @@ reel.addEventListener('click', e => { if(e.target.tagName === 'IMG') go(); });
   window.addEventListener(ev, stopNudge, {passive:true})
 );
 
-document.addEventListener('visibilitychange', () => {
-  if(document.hidden){ clearTimeout(autoTimer); autoTimer = null; }
-  else if(START_ON === "load" && !sent) startAuto();
-});
+// when the page becomes visible for real, make sure the counter is running
+['visibilitychange','pageshow','focus'].forEach(ev =>
+  window.addEventListener(ev, () => { if(START_ON === "load" && !sent) startAuto(); })
+);
 
 /* ---- first load ---- */
 render(nextSet());
