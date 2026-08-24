@@ -108,6 +108,7 @@ const AUTO_RETURN = 5000;                 // auto-redirect delay, return visits
 const AUTO_MAX    = 3;                    // how many visits get auto-redirect
                                           // (after this: tap only. 0 = never auto)
 const START_ON  = "load";                 // "load" or "scroll"
+const DEBUG     = true;                   // true = log timer info to console
 
 /* ============================================== */
 
@@ -116,6 +117,11 @@ let imgs = [], io = null, anim = null;
 let nudging = false, userTook = false, sent = false, autoTimer = null;
 
 /* ---- remembers which images this visitor already saw ---- */
+// open the page with ?reset on the end to wipe the visitor memory (testing)
+if(location.search.indexOf('reset') > -1){
+  try { localStorage.removeItem('rseen'); } catch(e){}
+}
+
 let memRec = null;
 let visitNo = 0;                  // 0 = first visit, 1 = first return, ...
 
@@ -235,12 +241,18 @@ function go(){
   if(sent) return;
   sent = true;
   clearTimeout(autoTimer);
-  location.href = DEST;
+  if(DEBUG) console.log('[reel] redirecting ->', DEST);
+  try { (window.top || window).location.href = DEST; }
+  catch(e){ location.href = DEST; }
 }
 function startAuto(){
   if(autoTimer || sent) return;
-  if(visitNo >= AUTO_MAX) return;              // tap-only from here on
+  if(visitNo >= AUTO_MAX){
+    if(DEBUG) console.log('[reel] visit', visitNo, '- auto-redirect used up, tap only. Add ?reset to the URL to start over.');
+    return;
+  }
   const delay = visitNo === 0 ? AUTO_FIRST : AUTO_RETURN;
+  if(DEBUG) console.log('[reel] visit', visitNo, '- auto-redirect in', delay/1000, 'sec');
   autoTimer = setTimeout(go, delay);
 }
 
