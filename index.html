@@ -11,8 +11,12 @@
     height:100dvh;
     overflow-y:scroll;
     scroll-snap-type:y mandatory;
+    scroll-behavior:smooth;
     -webkit-overflow-scrolling:touch;
     scrollbar-width:none;
+  }
+  @media (prefers-reduced-motion:reduce){
+    #reel{scroll-behavior:auto}
   }
   #reel::-webkit-scrollbar{display:none}
   .slide{
