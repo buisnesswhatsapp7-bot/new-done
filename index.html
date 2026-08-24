@@ -7,6 +7,7 @@
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%;background:#000;overscroll-behavior-y:none}
+
   #reel{
     height:100dvh;
     overflow-y:scroll;
@@ -14,12 +15,39 @@
     scroll-behavior:smooth;
     -webkit-overflow-scrolling:touch;
     scrollbar-width:none;
+    /* keep the scroller on its own compositor layer */
+    will-change:scroll-position;
+    transform:translateZ(0);
   }
+  #reel::-webkit-scrollbar{display:none}
+
+  .slide{
+    height:100dvh;
+    scroll-snap-align:start;
+    scroll-snap-stop:always;
+    contain:layout paint;          /* don't repaint neighbours */
+    transform:translateZ(0);       /* own GPU layer */
+    backface-visibility:hidden;
+  }
+  .slide img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+    border:0;
+    transform:translateZ(0);
+    backface-visibility:hidden;
+    opacity:0;
+    transition:opacity .3s ease-out;
+  }
+  .slide img.in{opacity:1}
+
   @media (prefers-reduced-motion:reduce){
     #reel{scroll-behavior:auto}
+    .slide img{transition:none;opacity:1}
   }
 
-  /* scroll cue — first slide only, disappears for good after first scroll */
+  /* scroll cue — first slide only, gone for good after first real scroll */
   #cue{
     position:fixed;left:0;right:0;bottom:0;
     z-index:5;
@@ -29,6 +57,7 @@
     background:linear-gradient(to top,rgba(0,0,0,.55),rgba(0,0,0,0));
     pointer-events:none;
     transition:opacity .45s ease;
+    will-change:opacity;
   }
   #cue.gone{opacity:0}
   #cue span{
@@ -38,27 +67,15 @@
     transform:rotate(45deg);
     border-radius:2px;
     filter:drop-shadow(0 2px 6px rgba(0,0,0,.6));
-    animation:bob 1.5s ease-in-out infinite;
+    animation:bob 1.8s cubic-bezier(.45,0,.25,1) infinite;
+    will-change:transform,opacity;
   }
   @keyframes bob{
-    0%,100%{transform:rotate(45deg) translate(0,0);opacity:.55}
+    0%,100%{transform:rotate(45deg) translate(0,0);opacity:.5}
     50%    {transform:rotate(45deg) translate(6px,6px);opacity:1}
   }
   @media (prefers-reduced-motion:reduce){
     #cue span{animation:none;opacity:.85}
-  }
-  #reel::-webkit-scrollbar{display:none}
-  .slide{
-    height:100dvh;
-    scroll-snap-align:start;
-    scroll-snap-stop:always;
-  }
-  .slide img{
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    display:block;
-    border:0;
   }
 </style>
 </head>
@@ -74,7 +91,7 @@ const SLIDES = [
   "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2718.PNG",
   "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2716.PNG"
 ];
-const AHEAD = 2;
+const AHEAD = 3;          // slides preloaded + decoded ahead of you
 /* ----------------------------- */
 
 const reel = document.getElementById('reel'), imgs = [];
@@ -83,23 +100,59 @@ SLIDES.forEach((src,i)=>{
   const s = document.createElement('section');
   s.className = 'slide';
   const img = document.createElement('img');
-  img.alt = ''; img.decoding = 'async';
-  if(i < 2){ img.src = src; img.fetchPriority = i ? 'auto' : 'high'; }
-  else { img.dataset.src = src; img.loading = 'lazy'; }
+  img.alt = ''; img.decoding = 'async'; img.dataset.src = src;
   s.appendChild(img); reel.appendChild(s); imgs.push(img);
 });
 
-const load = i => { const m = imgs[i]; if(m && m.dataset.src){ m.src = m.dataset.src; delete m.dataset.src; } };
+/* Load AND decode off-thread before painting, so no slide ever
+   decodes a full-screen PNG while your finger is moving. */
+function load(i){
+  const img = imgs[i];
+  if(!img || !img.dataset.src) return;
+  const src = img.dataset.src;
+  delete img.dataset.src;
+
+  const pre = new Image();
+  pre.decoding = 'async';
+  if(i === 0) pre.fetchPriority = 'high';
+  pre.src = src;
+
+  const show = () => { img.src = src; requestAnimationFrame(() => img.classList.add('in')); };
+  (pre.decode ? pre.decode().then(show).catch(show) : (pre.onload = show, pre.onerror = show));
+}
+for(let i = 0; i <= AHEAD; i++) load(i);
 
 const io = new IntersectionObserver(es => es.forEach(e => {
   if(e.isIntersecting){
     const i = [...reel.children].indexOf(e.target);
     for(let n = 1; n <= AHEAD; n++) load(i + n);
   }
-}), {root: reel, threshold: .5});
+}), {root: reel, threshold: .25});
 [...reel.children].forEach(s => io.observe(s));
 
-// hide the scroll cue the moment they move
+/* ---------- smooth scrolling engine ---------- */
+let anim = null;
+const easeInOutCubic = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+const easeOutQuint   = t => 1 - Math.pow(1-t, 5);
+
+function glide(to, duration, ease){
+  return new Promise(done => {
+    cancelAnimationFrame(anim);
+    const from = reel.scrollTop, dist = to - from;
+    if(Math.abs(dist) < 1){ done(true); return; }
+    let start = null;
+    const step = now => {
+      if(start === null) start = now;
+      const t = Math.min((now - start) / duration, 1);
+      reel.scrollTop = from + dist * ease(t);
+      if(t < 1 && nudging) anim = requestAnimationFrame(step);
+      else done(t >= 1);
+    };
+    anim = requestAnimationFrame(step);
+  });
+}
+/* --------------------------------------------- */
+
 const cue = document.getElementById('cue');
 let nudging = false, userTook = false;
 
@@ -110,43 +163,41 @@ function hideCue(){
 }
 
 reel.addEventListener('scroll', () => {
-  if(nudging) return;                 // ignore our own animation
+  if(nudging) return;
   if(reel.scrollTop > 20) hideCue();
 }, {passive:true});
 
-// user takes over -> cancel the nudge immediately
+function stopNudge(){
+  userTook = true;
+  if(nudging){
+    nudging = false;
+    cancelAnimationFrame(anim);
+    reel.style.scrollSnapType = 'y mandatory';
+  }
+}
 ['touchstart','wheel','keydown','pointerdown'].forEach(ev =>
-  window.addEventListener(ev, () => {
-    userTook = true;
-    if(nudging){ nudging = false; reel.style.scrollSnapType = 'y mandatory'; }
-  }, {passive:true, once:false})
+  window.addEventListener(ev, stopNudge, {passive:true})
 );
 
-/* auto-nudge: peek at image 2, then settle back on image 1 */
+/* auto-nudge: ease down to half of image 2, hold, ease back */
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
 async function nudge(){
   if(userTook || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   nudging = true;
-  reel.style.scrollSnapType = 'none';           // snap off, or it fights us
+  reel.style.scrollSnapType = 'none';     // snap would fight the animation
 
-  reel.scrollTo({top: window.innerHeight * 0.5, behavior: 'smooth'});
-  await wait(700);
-  if(!nudging) return;                          // user interrupted
-
-  await wait(600);                              // hold the peek
+  if(!await glide(window.innerHeight * 0.5, 1100, easeInOutCubic)) return;
+  await wait(650);
   if(!nudging) return;
-
-  reel.scrollTo({top: 0, behavior: 'smooth'});
-  await wait(700);
+  if(!await glide(0, 950, easeOutQuint)) return;
 
   nudging = false;
-  reel.style.scrollSnapType = 'y mandatory';    // snap back on
+  reel.style.scrollSnapType = 'y mandatory';
 }
 
-// run once image 1 is actually on screen
-if(imgs[0].complete) setTimeout(nudge, 500);
-else imgs[0].addEventListener('load', () => setTimeout(nudge, 500), {once:true});
+if(imgs[0].complete) setTimeout(nudge, 600);
+else imgs[0].addEventListener('load', () => setTimeout(nudge, 600), {once:true});
 </script>
 </body>
 </html>
