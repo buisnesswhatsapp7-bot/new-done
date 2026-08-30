@@ -23,42 +23,91 @@ body{font-family:Arial,sans-serif}
 
 <script>
 const DATA={"images": ["https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-27-29-90_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-25-04-34_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-24-50-30_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-24-34-29_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-20-21-29_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/IMG_2725.PNG", "https://instantchatroom.org/new%20done/IMG_2724.PNG", "https://instantchatroom.org/new%20done/IMG_2723.PNG", "https://instantchatroom.org/new%20done/IMG_2722.PNG", "https://instantchatroom.org/new%20done/IMG_2721.PNG", "https://instantchatroom.org/new%20done/IMG_2720.PNG", "https://instantchatroom.org/new%20done/IMG_2719.PNG", "https://instantchatroom.org/new%20done/IMG_2718.PNG", "https://instantchatroom.org/new%20done/IMG_2716.PNG", "https://instantchatroom.org/new%20done/IMG_20260824_172321.jpg"], "articles": ["https://usa.msfcfinance.in/study-in-usa-universities-2026-cost-loans-visa-salary-and-best-universities-for-international-students-%f0%9f%87%ba%f0%9f%87%b8/", "https://usa.msfcfinance.in/study-in-uk-universities-2026-tuition-fees-mba-cost-scholarships-student-visa-bank-balance-and-graduate-salary-roi/", "https://usa.msfcfinance.in/study-in-new-zealand-2026-2027-university-fees-student-visa-education-loans-ielts-score-salary-pr-complete-tier-1-guide/", "https://usa.msfcfinance.in/study-in-australia-2026-complete-guide-for-international-students-universities-fees-visa-loans-pr-high-salary-careers/"]};
-const HISTORY_KEY="image_feed_used_pairs_v3";
-const RETURN_KEY="image_feed_return_v3";
-const SESSION_FIRST_KEY="image_feed_first_v3";
+const HISTORY_KEY="image_feed_strict_history_v4";
+const IMAGE_KEY="image_feed_used_images_v4";
+const ARTICLE_KEY="image_feed_used_articles_v4";
+const RETURN_KEY="image_feed_return_v4";
 
-function loadHistory(){
-  try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]")}
+function load(key){
+  try{return JSON.parse(localStorage.getItem(key)||"[]")}
   catch(e){return[]}
 }
-function saveHistory(a){localStorage.setItem(HISTORY_KEY,JSON.stringify(a))}
+function save(key,a){localStorage.setItem(key,JSON.stringify(a))}
 function shuffle(a){
   a=[...a];
-  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
   return a;
 }
 
-/* 15 images x 4 articles = 60 unique pairs. */
-let used=loadHistory();
+let usedPairs=load(HISTORY_KEY);
+let usedImages=load(IMAGE_KEY);
+let usedArticles=load(ARTICLE_KEY);
 
 function nextPair(){
-  let available=[];
-  for(const image of DATA.images){
-    for(const article of DATA.articles){
+  let availableArticles=DATA.articles.filter(a=>!usedArticles.includes(a));
+
+  // After all 4 articles have been used, start a fresh article cycle.
+  if(!availableArticles.length){
+    usedArticles=[];
+    save(ARTICLE_KEY,usedArticles);
+    availableArticles=[...DATA.articles];
+  }
+
+  let availableImages=DATA.images.filter(i=>!usedImages.includes(i));
+
+  // After all 15 images have been used, start a fresh image cycle.
+  if(!availableImages.length){
+    usedImages=[];
+    save(IMAGE_KEY,usedImages);
+    availableImages=[...DATA.images];
+  }
+
+  // Prefer combinations that have never been used.
+  let candidates=[];
+  for(const image of availableImages){
+    for(const article of availableArticles){
       const key=image+"|||"+article;
-      if(!used.includes(key)) available.push({image,article,key});
+      if(!usedPairs.includes(key)) candidates.push({image,article,key});
     }
   }
-  if(!available.length){
-    used=[];
-    for(const image of DATA.images)
-      for(const article of DATA.articles)
-        available.push({image,article,key:image+"|||"+article});
+
+  // If the remaining unused image/article pools contain only used pairs,
+  // choose any unused-image + unused-article pair and start a pair cycle
+  // only when all 60 combinations have already been consumed.
+  if(!candidates.length){
+    if(usedPairs.length>=DATA.images.length*DATA.articles.length){
+      usedPairs=[];
+      save(HISTORY_KEY,usedPairs);
+      for(const image of availableImages)
+        for(const article of availableArticles)
+          candidates.push({image,article,key:image+"|||"+article});
+    }else{
+      // Find any globally unused pair while still respecting the current
+      // article/image cycle as much as possible.
+      for(const image of DATA.images){
+        for(const article of availableArticles){
+          const key=image+"|||"+article;
+          if(!usedPairs.includes(key) && !usedImages.includes(image)){
+            candidates.push({image,article,key});
+          }
+        }
+      }
+    }
   }
-  const p=shuffle(available)[0];
-  used.push(p.key);
-  saveHistory(used);
-  return p;
+
+  const selected=shuffle(candidates)[0];
+  usedPairs.push(selected.key);
+  usedImages.push(selected.image);
+  usedArticles.push(selected.article);
+
+  save(HISTORY_KEY,usedPairs);
+  save(IMAGE_KEY,usedImages);
+  save(ARTICLE_KEY,usedArticles);
+
+  return {image:selected.image,article:selected.article};
 }
 
 let redirectTimer=null;
@@ -123,18 +172,23 @@ const observer=new IntersectionObserver(entries=>{
   }
 },{threshold:[0.75]});
 
-/* Initial feed. Every screen gets its own never-before-used pair. */
-for(let i=0;i<5;i++){
+/* Start with ONE screen so every viewed screen gets a controlled new article. */
+const firstPair=nextPair();
+makeItem(firstPair);
+
+/* Add exactly one new screen at a time. */
+let lastAddedScroll=0;
+function addMore(){
   const p=nextPair();
   makeItem(p);
 }
-
-/* Keep several screens ready. */
-function addMore(){
-  for(let i=0;i<3;i++) makeItem(nextPair());
-}
 feed.addEventListener("scroll",()=>{
-  if(feed.scrollTop+feed.clientHeight>=feed.scrollHeight-feed.clientHeight*2) addMore();
+  if(feed.scrollTop+feed.clientHeight>=feed.scrollHeight-feed.clientHeight*1.5){
+    if(Math.abs(feed.scrollTop-lastAddedScroll)>50){
+      lastAddedScroll=feed.scrollTop;
+      addMore();
+    }
+  }
 },{passive:true});
 
 /*
