@@ -19,7 +19,8 @@ body{font-family:Arial,sans-serif}
 </head>
 <body>
 <main id="feed"></main>
-<script>if ("scrollRestoration" in history) history.scrollRestoration = "manual";</script>
+<script>
+history.scrollRestoration="manual";if ("scrollRestoration" in history) history.scrollRestoration = "manual";</script>
 
 <script>
 const DATA={"images": ["https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-27-29-90_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-25-04-34_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-24-50-30_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-24-34-29_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-20-21-29_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/IMG_2725.PNG", "https://instantchatroom.org/new%20done/IMG_2724.PNG", "https://instantchatroom.org/new%20done/IMG_2723.PNG", "https://instantchatroom.org/new%20done/IMG_2722.PNG", "https://instantchatroom.org/new%20done/IMG_2721.PNG", "https://instantchatroom.org/new%20done/IMG_2720.PNG", "https://instantchatroom.org/new%20done/IMG_2719.PNG", "https://instantchatroom.org/new%20done/IMG_2718.PNG", "https://instantchatroom.org/new%20done/IMG_2716.PNG", "https://instantchatroom.org/new%20done/IMG_20260824_172321.jpg"], "articles": ["https://usa.msfcfinance.in/study-in-usa-universities-2026-cost-loans-visa-salary-and-best-universities-for-international-students-%f0%9f%87%ba%f0%9f%87%b8/", "https://usa.msfcfinance.in/study-in-uk-universities-2026-tuition-fees-mba-cost-scholarships-student-visa-bank-balance-and-graduate-salary-roi/", "https://usa.msfcfinance.in/study-in-new-zealand-2026-2027-university-fees-student-visa-education-loans-ielts-score-salary-pr-complete-tier-1-guide/", "https://usa.msfcfinance.in/study-in-australia-2026-complete-guide-for-international-students-universities-fees-visa-loans-pr-high-salary-careers/"]};
@@ -146,6 +147,7 @@ function makeItem(pair){
   img.loading="eager";
   img.decoding="async";
   img.draggable=false;
+  img.onerror=()=>{ img.style.visibility="hidden"; };
 
   const activate=(e)=>{
     e.preventDefault();
@@ -208,9 +210,12 @@ window.addEventListener("pageshow",()=> {
   feed.style.visibility="hidden";
   feed.innerHTML="";
 
-  used=loadHistory();
+  usedPairs=load(HISTORY_KEY);
+  usedImages=load(IMAGE_KEY);
+  usedArticles=load(ARTICLE_KEY);
 
-  for(let i=0;i<5;i++) makeItem(nextPair());
+  const fresh=nextPair();
+  makeItem(fresh);
 
   feed.scrollTop=0;
 
