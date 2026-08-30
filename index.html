@@ -1,396 +1,172 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<link rel="preconnect" href="https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev" crossorigin>
-<link rel="dns-prefetch" href="https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev">
-<title>Reel</title>
+<meta name="theme-color" content="#000">
+<title>Image Feed</title>
+<link rel="preconnect" href="https://usa.msfcfinance.in" crossorigin>
+<link rel="dns-prefetch" href="//usa.msfcfinance.in">
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  html,body{height:100%;background:#000;overscroll-behavior-y:none}
-
-  #reel{
-    height:100dvh;overflow-y:scroll;
-    scroll-snap-type:y mandatory;
-    scroll-behavior:smooth;
-    -webkit-overflow-scrolling:touch;
-    scrollbar-width:none;
-    will-change:scroll-position;transform:translateZ(0);
-  }
-  #reel::-webkit-scrollbar{display:none}
-
-  .slide{
-    height:100dvh;
-    scroll-snap-align:start;scroll-snap-stop:always;
-    contain:layout paint;
-    transform:translateZ(0);backface-visibility:hidden;
-  }
-  .slide img{
-    width:100%;height:100%;object-fit:cover;
-    display:block;border:0;
-    transform:translateZ(0);backface-visibility:hidden;
-    opacity:0;transition:opacity .15s ease-out;
-  }
-  .slide img.in{opacity:1}
-
-  #cue{
-    position:fixed;left:0;right:0;bottom:0;z-index:5;height:220px;
-    display:flex;align-items:flex-end;justify-content:center;
-    padding-bottom:calc(90px + env(safe-area-inset-bottom));
-    background:linear-gradient(to top,rgba(0,0,0,.55),rgba(0,0,0,0));
-    pointer-events:none;transition:opacity .45s ease;will-change:opacity;
-  }
-  #cue.gone{opacity:0}
-  #cue span{
-    display:block;width:26px;height:26px;
-    border-right:2.5px solid #fff;border-bottom:2.5px solid #fff;
-    transform:rotate(45deg);border-radius:2px;
-    filter:drop-shadow(0 2px 6px rgba(0,0,0,.6));
-    animation:bob 1.8s cubic-bezier(.45,0,.25,1) infinite;
-    will-change:transform,opacity;
-  }
-  @keyframes bob{
-    0%,100%{transform:rotate(45deg) translate(0,0);opacity:.5}
-    50%{transform:rotate(45deg) translate(6px,6px);opacity:1}
-  }
-
-  #dbg{
-    position:fixed;top:0;left:0;z-index:99;
-    background:rgba(0,0,0,.8);color:#0f0;
-    font:11px/1.4 monospace;padding:6px 8px;
-    max-width:100%;white-space:pre-wrap;pointer-events:none;
-  }
-
-  @media (prefers-reduced-motion:reduce){
-    #reel{scroll-behavior:auto}
-    .slide img{transition:none;opacity:1}
-    #cue span{animation:none;opacity:.85}
-  }
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden}
+body{font-family:Arial,sans-serif}
+#feed{width:100%;height:100dvh;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
+.item{position:relative;width:100%;height:100dvh;min-height:100dvh;scroll-snap-align:start;scroll-snap-stop:always;background:#000}
+.item a{display:block;width:100%;height:100%;touch-action:manipulation}
+.item img{display:block;width:100%;height:100%;object-fit:cover;user-select:none;-webkit-user-drag:none}
 </style>
 </head>
 <body>
-<main id="reel"></main>
-<div id="cue"><span></span></div>
+<main id="feed"></main>
+
 <script>
-/* ==================== EDIT THIS BLOCK ==================== */
+const DATA={"images": ["https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-27-29-90_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-25-04-34_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-24-50-30_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-24-34-29_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-20-21-29_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/IMG_2725.PNG", "https://instantchatroom.org/new%20done/IMG_2724.PNG", "https://instantchatroom.org/new%20done/IMG_2723.PNG", "https://instantchatroom.org/new%20done/IMG_2722.PNG", "https://instantchatroom.org/new%20done/IMG_2721.PNG", "https://instantchatroom.org/new%20done/IMG_2720.PNG", "https://instantchatroom.org/new%20done/IMG_2719.PNG", "https://instantchatroom.org/new%20done/IMG_2718.PNG", "https://instantchatroom.org/new%20done/IMG_2716.PNG", "https://instantchatroom.org/new%20done/IMG_20260824_172321.jpg"], "articles": ["https://usa.msfcfinance.in/study-in-usa-universities-2026-cost-loans-visa-salary-and-best-universities-for-international-students-%f0%9f%87%ba%f0%9f%87%b8/", "https://usa.msfcfinance.in/study-in-uk-universities-2026-tuition-fees-mba-cost-scholarships-student-visa-bank-balance-and-graduate-salary-roi/", "https://usa.msfcfinance.in/study-in-new-zealand-2026-2027-university-fees-student-visa-education-loans-ielts-score-salary-pr-complete-tier-1-guide/", "https://usa.msfcfinance.in/study-in-australia-2026-complete-guide-for-international-students-universities-fees-visa-loans-pr-high-salary-careers/"]};
+const HISTORY_KEY="image_feed_used_pairs_v3";
+const RETURN_KEY="image_feed_return_v3";
+const SESSION_FIRST_KEY="image_feed_first_v3";
 
-const POOL = [
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/Screenshot_2026-08-24-17-20-21-29_a23b203fd3aafc6dcb84e438dda678b6-100kb.jpg",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2720.PNG",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2719.PNG",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2718.PNG",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2716.PNG",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2722.PNG",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2725.PNG",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2723.PNG",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_2724.PNG",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/Screenshot_2026-08-24-17-20-21-29_a23b203fd3aafc6dcb84e438dda678b6.jpg",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/Screenshot_2026-08-24-17-24-34-29_a23b203fd3aafc6dcb84e438dda678b6.jpg",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/Screenshot_2026-08-24-17-24-50-30_a23b203fd3aafc6dcb84e438dda678b6.jpg",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/Screenshot_2026-08-24-17-25-04-34_a23b203fd3aafc6dcb84e438dda678b6.jpg",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/Screenshot_2026-08-24-17-27-29-90_a23b203fd3aafc6dcb84e438dda678b6.jpg",
-  "https://pub-5f52dd93f3804fbcb113f853eb38a385.r2.dev/new%20done/IMG_20260824_172321.jpg"
-];
-
-const DEST        = "https://msfcfinance.in/2025/09/12/best-credit-cards-in-the-uk-2025-cashback-0-deals-travel-cards-you-should-know-about/";
-
-const PER_VISIT   = 5;              // images shown per visit
-const AUTO_FIRST  = 8000;           // first visit: redirect after 8s on screen
-const AUTO_RETURN = 5000;           // return visits: 5s
-const AUTO_MAX    = 5;              // visits that get a timer (then tap only)
-const MEMORY_MS   = 3*60*1000;     // how long the visitor is remembered
-const AHEAD       = 2;              // images preloaded ahead
-const DEBUG       = false;          // true = show on-screen status box (testing only)
-
-/* ========================================================= */
-
-const reel = document.getElementById('reel');
-let imgs = [], io = null, anim = null;
-let nudging = false, userTook = false, sent = false;
-let elapsed = 0, ticker = null, lastTick = 0, visitNo = 0;
-
-/* ---------- debug badge (phones have no console) ---------- */
-let dbgBox = null;
-function log(msg){
-  if(!DEBUG) return;
-  if(!dbgBox){
-    dbgBox = document.createElement('div');
-    dbgBox.id = 'dbg';
-    document.body.appendChild(dbgBox);
-  }
-  dbgBox.textContent = msg;
-  try { console.log('[reel]', msg); } catch(e){}
+function loadHistory(){
+  try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]")}
+  catch(e){return[]}
+}
+function saveHistory(a){localStorage.setItem(HISTORY_KEY,JSON.stringify(a))}
+function shuffle(a){
+  a=[...a];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
+  return a;
 }
 
-/* ---------- visitor memory ---------- */
-if(location.search.indexOf('reset') > -1){
-  try { localStorage.removeItem('rseen'); } catch(e){}
-}
-let memRec = null;
+/* 15 images x 4 articles = 60 unique pairs. */
+let used=loadHistory();
 
-function recGet(){
-  let rec = memRec;
-  try {
-    const raw = localStorage.getItem('rseen');
-    if(raw) rec = JSON.parse(raw);
-  } catch(e){}
-  if(!rec || !rec.t || Date.now() - rec.t > MEMORY_MS) return null;
-  return rec;
-}
-function recSet(list, v){
-  const rec = {t: Date.now(), list: list, v: v};
-  memRec = rec;
-  try { localStorage.setItem('rseen', JSON.stringify(rec)); } catch(e){}
-}
-
-/* Only images this visitor has not seen. Restarts when the pool runs out. */
-function nextSet(){
-  const n = Math.min(PER_VISIT, POOL.length);
-  const rec = recGet();
-  const seen = rec ? (rec.list || []) : [];
-  visitNo = rec ? (rec.v || 0) : 0;
-
-  const unseen = POOL.filter(u => seen.indexOf(u) === -1);
-  let out = unseen.slice(0, n);
-
-  if(out.length < n){
-    const rest = POOL.filter(u => out.indexOf(u) === -1);
-    out = out.concat(rest.slice(0, n - out.length));
-    recSet(out, visitNo + 1);
-  } else {
-    recSet(seen.concat(out), visitNo + 1);
-  }
-  return out;
-}
-
-/* ---------- image loading: decode before paint ---------- */
-let firstPainted = false;
-function onFirstPaint(){
-  if(firstPainted) return;
-  firstPainted = true;
-  startAuto();                       // clock starts when an image is ON SCREEN
-  setTimeout(nudge, 300);
-  // only NOW start the others - they were starving image 1 of bandwidth
-  for(let i = 1; i <= AHEAD; i++) load(i);
-}
-
-function load(i){
-  const img = imgs[i];
-  if(!img || !img.dataset.src) return;
-  const src = img.dataset.src;
-  delete img.dataset.src;
-
-  const pre = new Image();
-  pre.decoding = 'async';
-  if(i === 0) pre.fetchPriority = 'high';
-
-  const show = () => {
-    img.src = src;
-    requestAnimationFrame(() => img.classList.add('in'));
-    if(i === 0) onFirstPaint();
-  };
-  const fail = () => {
-    const s = img.parentElement;
-    if(s) s.style.display = 'none';
-    if(i === 0) onFirstPaint();      // broken first image must not stall the page
-  };
-
-  pre.onload  = show;
-  pre.onerror = fail;
-  pre.src = src;
-  // image 1 shows immediately; later ones wait for decode so swipes stay smooth
-  if(i > 0 && pre.decode) pre.decode().then(show).catch(() => {});
-}
-
-/* ---------- smooth scroll engine ---------- */
-const easeInOutCubic = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
-const easeOutQuint   = t => 1 - Math.pow(1-t,5);
-const wait = ms => new Promise(r => setTimeout(r, ms));
-
-function glide(to, duration, ease){
-  return new Promise(done => {
-    cancelAnimationFrame(anim);
-    const from = reel.scrollTop, dist = to - from;
-    if(Math.abs(dist) < 1){ done(true); return; }
-    let start = null;
-    const step = now => {
-      if(start === null) start = now;
-      const t = Math.min((now - start) / duration, 1);
-      reel.scrollTop = from + dist * ease(t);
-      if(t < 1 && nudging) anim = requestAnimationFrame(step);
-      else done(t >= 1);
-    };
-    anim = requestAnimationFrame(step);
-  });
-}
-
-/* ---------- scroll cue ---------- */
-function cueEl(){ return document.getElementById('cue'); }
-function cueShow(){
-  const c = cueEl();
-  if(c){ c.classList.remove('gone'); return; }
-  const d = document.createElement('div');
-  d.id = 'cue'; d.innerHTML = '<span></span>';
-  document.body.appendChild(d);
-}
-function cueHide(){
-  const c = cueEl();
-  if(!c) return;
-  c.classList.add('gone');
-  setTimeout(() => { if(c.parentNode) c.remove(); }, 500);
-}
-
-/* ---------- nudge ---------- */
-async function nudge(){
-  if(userTook || sent) return;
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  nudging = true;
-  reel.style.scrollSnapType = 'none';
-  const ok1 = await glide(window.innerHeight * 0.5, 1100, easeInOutCubic);
-  if(!ok1 || !nudging){ reel.style.scrollSnapType = 'y mandatory'; return; }
-  await wait(650);
-  if(!nudging){ reel.style.scrollSnapType = 'y mandatory'; return; }
-  await glide(0, 950, easeOutQuint);
-  nudging = false;
-  reel.style.scrollSnapType = 'y mandatory';
-}
-function stopNudge(){
-  userTook = true;
-  if(nudging){
-    nudging = false;
-    cancelAnimationFrame(anim);
-    reel.style.scrollSnapType = 'y mandatory';
-  }
-}
-
-/* ---------- redirect ---------- */
-function go(){
-  if(sent) return;
-  sent = true;
-  stopTicker();
-  log('redirecting now');
-
-  // Plant TWO spare history entries pointing at this same page.
-  // A self-triggered redirect overwrites a history entry instead of
-  // adding one - these spares get eaten instead of the reel page,
-  // so Back still lands here.
-  try {
-    history.pushState({r:1}, '', location.href);
-    history.pushState({r:2}, '', location.href);
-  } catch(e){}
-
-  // ONE navigation only. Every extra one overwrites history again.
-  try {
-    const a = document.createElement('a');
-    a.href = DEST; a.target = '_top';
-    a.style.cssText = 'position:fixed;left:-9999px;top:0';
-    document.body.appendChild(a);
-    a.click();
-  } catch(e){
-    location.href = DEST;
-  }
-}
-
-/* Counts only seconds the page is really on screen.
-   Facebook preloads pages hidden and freezes plain timers. */
-function stopTicker(){
-  if(ticker){ clearInterval(ticker); ticker = null; }
-}
-function tick(){
-  const now = Date.now();
-  if(document.visibilityState === 'hidden'){ lastTick = now; return; }
-  elapsed += now - lastTick;
-  lastTick = now;
-  const delay = visitNo === 0 ? AUTO_FIRST : AUTO_RETURN;
-  if(DEBUG) log('visit ' + visitNo + ' | ' + (elapsed/1000).toFixed(1) + 's / ' + (delay/1000) + 's');
-  if(elapsed >= delay) go();
-}
-function startAuto(){
-  if(sent || ticker) return;
-  if(visitNo >= AUTO_MAX){
-    log('visit ' + visitNo + ' - tap only (add ?reset to URL to restart)');
-    return;
-  }
-  lastTick = Date.now();
-  ticker = setInterval(tick, 200);
-}
-
-/* ---------- build / rebuild ---------- */
-function render(list){
-  stopTicker();
-  cancelAnimationFrame(anim);
-  if(io) io.disconnect();
-
-  reel.innerHTML = '';
-  imgs = [];
-  elapsed = 0; firstPainted = false;
-  nudging = false; userTook = false; sent = false;
-  reel.style.scrollSnapType = 'y mandatory';
-
-  list.forEach(src => {
-    const s = document.createElement('section');
-    s.className = 'slide';
-    const img = document.createElement('img');
-    img.alt = ''; img.decoding = 'async'; img.dataset.src = src;
-    s.appendChild(img);
-    reel.appendChild(s);
-    imgs.push(img);
-  });
-
-  reel.scrollTop = 0;
-  cueShow();
-  log('visit ' + visitNo + ' | ' + list.length + ' images | loading...');
-
-  load(0);
-
-  io = new IntersectionObserver(es => es.forEach(e => {
-    if(e.isIntersecting){
-      const i = Array.prototype.indexOf.call(reel.children, e.target);
-      for(let n = 1; n <= AHEAD; n++) load(i + n);
+function nextPair(){
+  let available=[];
+  for(const image of DATA.images){
+    for(const article of DATA.articles){
+      const key=image+"|||"+article;
+      if(!used.includes(key)) available.push({image,article,key});
     }
-  }), {root: reel, threshold: .25});
-  Array.prototype.forEach.call(reel.children, s => io.observe(s));
-
-  // safety net: if nothing loads within 4s, start anyway
-  setTimeout(onFirstPaint, 4000);
+  }
+  if(!available.length){
+    used=[];
+    for(const image of DATA.images)
+      for(const article of DATA.articles)
+        available.push({image,article,key:image+"|||"+article});
+  }
+  const p=shuffle(available)[0];
+  used.push(p.key);
+  saveHistory(used);
+  return p;
 }
 
-/* ---------- listeners (bound once) ---------- */
-reel.addEventListener('scroll', () => {
-  if(nudging) return;
-  if(reel.scrollTop > 20) cueHide();
-}, {passive:true});
+let redirectTimer=null;
+let navigating=false;
+let currentArticle=null;
 
-reel.addEventListener('click', e => {
-  if(e.target && e.target.tagName === 'IMG') go();
+function beginTimer(article){
+  currentArticle=article;
+  navigating=false;
+  clearTimeout(redirectTimer);
+  redirectTimer=setTimeout(()=>go(article),15000);
+}
+
+function go(article){
+  if(!article || navigating)return;
+  navigating=true;
+  clearTimeout(redirectTimer);
+  sessionStorage.setItem(RETURN_KEY,"1");
+  // Direct same-tab navigation: no artificial delay.
+  window.location.replace(article);
+}
+
+function makeItem(pair){
+  const section=document.createElement("section");
+  section.className="item";
+  section.dataset.article=pair.article;
+
+  const a=document.createElement("a");
+  a.href=pair.article;
+  a.target="_self";
+  a.rel="noopener";
+
+  const img=document.createElement("img");
+  img.src=pair.image;
+  img.alt="";
+  img.loading="eager";
+  img.decoding="async";
+  img.draggable=false;
+
+  const activate=(e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    go(pair.article);
+  };
+  a.addEventListener("pointerup",activate,{passive:false});
+  a.addEventListener("click",activate,{passive:false});
+
+  a.appendChild(img);
+  section.appendChild(a);
+  feed.appendChild(section);
+  observer.observe(section);
+}
+
+const feed=document.getElementById("feed");
+
+const observer=new IntersectionObserver(entries=>{
+  for(const entry of entries){
+    if(entry.isIntersecting && entry.intersectionRatio>=0.75){
+      const article=entry.target.dataset.article;
+      beginTimer(article);
+    }
+  }
+},{threshold:[0.75]});
+
+/* Initial feed. Every screen gets its own never-before-used pair. */
+for(let i=0;i<5;i++){
+  const p=nextPair();
+  makeItem(p);
+}
+
+/* Keep several screens ready. */
+function addMore(){
+  for(let i=0;i<3;i++) makeItem(nextPair());
+}
+feed.addEventListener("scroll",()=>{
+  if(feed.scrollTop+feed.clientHeight>=feed.scrollHeight-feed.clientHeight*2) addMore();
+},{passive:true});
+
+/*
+  Critical return behavior:
+  The article is opened in the same tab. When Back returns to this page,
+  browser page restoration is ignored: the feed is cleared and rebuilt with
+  fresh unused pairs. Therefore the old image/article pair cannot reappear.
+*/
+window.addEventListener("pageshow",()=>{
+  if(sessionStorage.getItem(RETURN_KEY)!=="1") return;
+  sessionStorage.removeItem(RETURN_KEY);
+
+  requestAnimationFrame(()=>{
+    clearTimeout(redirectTimer);
+    navigating=false;
+    used=loadHistory();
+
+    feed.innerHTML="";
+    for(let i=0;i<5;i++) makeItem(nextPair());
+
+    feed.scrollTop=0;
+    const first=feed.querySelector(".item");
+    if(first) beginTimer(first.dataset.article);
+  });
 });
 
-['touchstart','wheel','keydown','pointerdown'].forEach(ev =>
-  window.addEventListener(ev, stopNudge, {passive:true})
-);
-
-// visibilitychange belongs on document, not window
-document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible' && firstPainted && !sent) startAuto();
-});
-window.addEventListener('focus', () => {
-  if(firstPainted && !sent) startAuto();
-});
-
-/* ---------- start ---------- */
-render(nextSet());
-
-/* Back button: page restored from cache, script never re-ran */
-window.addEventListener('pageshow', e => {
-  if(!e.persisted) return;
-  render(nextSet());
-});
-
-// Back landed on a spare entry: rebuild the page instead of leaving the site
-window.addEventListener('popstate', () => {
-  render(nextSet());
-});
+/* Preconnect/prefetch all four article destinations. */
+for(const url of DATA.articles){
+  const l=document.createElement("link");
+  l.rel="prefetch";
+  l.href=url;
+  document.head.appendChild(l);
+}
 </script>
 </body>
 </html>
