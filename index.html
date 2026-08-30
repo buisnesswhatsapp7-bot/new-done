@@ -11,7 +11,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden}
 body{font-family:Arial,sans-serif}
-#feed{width:100%;height:100dvh;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
+#feed{width:100%;height:100dvh;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior-y:none;-webkit-overflow-scrolling:touch}
 .item{position:relative;width:100%;height:100dvh;min-height:100dvh;scroll-snap-align:start;scroll-snap-stop:always;background:#000}
 .item a{display:block;width:100%;height:100%;touch-action:manipulation}
 .item img{display:block;width:100%;height:100%;object-fit:cover;user-select:none;-webkit-user-drag:none}
@@ -19,6 +19,7 @@ body{font-family:Arial,sans-serif}
 </head>
 <body>
 <main id="feed"></main>
+<script>if ("scrollRestoration" in history) history.scrollRestoration = "manual";</script>
 
 <script>
 const DATA={"images": ["https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-27-29-90_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-25-04-34_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-24-50-30_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-24-34-29_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/Screenshot_2026-08-24-17-20-21-29_a23b203fd3aafc6dcb84e438dda678b6.jpg", "https://instantchatroom.org/new%20done/IMG_2725.PNG", "https://instantchatroom.org/new%20done/IMG_2724.PNG", "https://instantchatroom.org/new%20done/IMG_2723.PNG", "https://instantchatroom.org/new%20done/IMG_2722.PNG", "https://instantchatroom.org/new%20done/IMG_2721.PNG", "https://instantchatroom.org/new%20done/IMG_2720.PNG", "https://instantchatroom.org/new%20done/IMG_2719.PNG", "https://instantchatroom.org/new%20done/IMG_2718.PNG", "https://instantchatroom.org/new%20done/IMG_2716.PNG", "https://instantchatroom.org/new%20done/IMG_20260824_172321.jpg"], "articles": ["https://usa.msfcfinance.in/study-in-usa-universities-2026-cost-loans-visa-salary-and-best-universities-for-international-students-%f0%9f%87%ba%f0%9f%87%b8/", "https://usa.msfcfinance.in/study-in-uk-universities-2026-tuition-fees-mba-cost-scholarships-student-visa-bank-balance-and-graduate-salary-roi/", "https://usa.msfcfinance.in/study-in-new-zealand-2026-2027-university-fees-student-visa-education-loans-ielts-score-salary-pr-complete-tier-1-guide/", "https://usa.msfcfinance.in/study-in-australia-2026-complete-guide-for-international-students-universities-fees-visa-loans-pr-high-salary-careers/"]};
@@ -142,19 +143,27 @@ feed.addEventListener("scroll",()=>{
   browser page restoration is ignored: the feed is cleared and rebuilt with
   fresh unused pairs. Therefore the old image/article pair cannot reappear.
 */
-window.addEventListener("pageshow",()=>{
-  if(sessionStorage.getItem(RETURN_KEY)!=="1") return;
+window.addEventListener("pageshow",()=> {
+  if (sessionStorage.getItem(RETURN_KEY)!=="1") return;
   sessionStorage.removeItem(RETURN_KEY);
 
+  clearTimeout(redirectTimer);
+  navigating=false;
+
+  // Freeze the old restored frame while replacing it.
+  feed.style.visibility="hidden";
+  feed.innerHTML="";
+
+  used=loadHistory();
+
+  for(let i=0;i<5;i++) makeItem(nextPair());
+
+  feed.scrollTop=0;
+
   requestAnimationFrame(()=>{
-    clearTimeout(redirectTimer);
-    navigating=false;
-    used=loadHistory();
-
-    feed.innerHTML="";
-    for(let i=0;i<5;i++) makeItem(nextPair());
-
     feed.scrollTop=0;
+    feed.style.visibility="visible";
+
     const first=feed.querySelector(".item");
     if(first) beginTimer(first.dataset.article);
   });
